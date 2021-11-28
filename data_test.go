@@ -2,7 +2,6 @@ package opaclient_test
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	opaclient "github.com/m-mizutani/opa-go-client"
@@ -20,14 +19,8 @@ type exampleResult struct {
 }
 
 func TestDataRequest(t *testing.T) {
-	url, ok := os.LookupEnv("OPA_BASE_URL")
-	if !ok {
-		t.Skip("OPA_BASE_URL is not set")
-	}
-
+	client := setupClient(t)
 	ctx := context.Background()
-	client, err := opaclient.New(url)
-	require.NoError(t, err)
 
 	t.Run("GET example", func(t *testing.T) {
 		var result exampleResult
