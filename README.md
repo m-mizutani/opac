@@ -1,6 +1,6 @@
 # OPA Go Client
 
-Unofficial OPA HTTP Client in Go.
+Unofficial [OPA](https://github.com/open-policy-agent/opa) HTTP Client in Go.
 
 ## Usage
 
