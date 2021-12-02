@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"net/http"
 )
 
 type DataRequest struct {
@@ -22,14 +23,15 @@ type dataOutput struct {
 
 func (x *Client) GetData(ctx context.Context, req *DataRequest, dst interface{}) error {
 	url := x.baseURL + "/v1/data/" + req.Path
-	method := "GET"
+	method := http.MethodGet
+
 	var data io.Reader
 	if req.Input != nil {
 		input := dataInput{
 			Input: req.Input,
 		}
 
-		method = "POST"
+		method = http.MethodPost
 		raw, err := json.Marshal(input)
 		if err != nil {
 			return ErrInvalidInput.Wrap(err)
