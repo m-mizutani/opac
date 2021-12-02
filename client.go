@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/m-mizutani/goerr"
+	"google.golang.org/api/idtoken"
 )
 
 type httpClient interface {
@@ -16,11 +17,10 @@ type httpClient interface {
 }
 
 type Client struct {
-	baseURL string
-	client  httpClient
+	baseURL         string
+	client          httpClient
+	enableGoogleIAP bool
 }
-
-type Option func(client *Client) error
 
 func New(baseURL string, options ...Option) (*Client, error) {
 	client := &Client{
@@ -47,10 +47,21 @@ func (x *Client) request(ctx context.Context, method, url string, data io.Reader
 		httpReq.Header.Add("Content-Type", "application/json")
 	}
 
-	httpResp, err := x.client.Do(httpReq)
+	client := x.client
+	if x.enableGoogleIAP {
+		newClient, err := idtoken.NewClient(ctx, url)
+		if err != nil {
+			return goerr.Wrap(err, "failed idtoken.NewClient for GCP IAP").With("url", url)
+		}
+		client = newClient
+	}
+
+	httpResp, err := client.Do(httpReq)
 	if err != nil {
 		return ErrRequestFailed.Wrap(err)
 	}
+
+	defer httpResp.Body.Close()
 	if httpResp.StatusCode != http.StatusOK {
 		body, _ := ioutil.ReadAll(httpResp.Body)
 		return goerr.Wrap(ErrRequestFailed, "status code is not OK").
