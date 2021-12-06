@@ -1,12 +1,19 @@
 package opaclient
 
+import (
+	"context"
+	"io"
+	"net/http"
+)
+
 type Option func(client *Client) error
 
-// OptEnableGoogleIAP enables Google Cloud IAP client.
-// If the option is enabled, HTTP client is renewed request by request.
-func OptEnableGoogleIAP() Option {
+type HTTPRequest func(ctx context.Context, method, url string, data io.Reader) (*http.Response, error)
+
+// OptHTTPRequest sets HTTPRequest sender
+func OptHTTPRequest(f HTTPRequest) Option {
 	return func(client *Client) error {
-		client.enableGoogleIAP = true
+		client.httpRequest = f
 		return nil
 	}
 }

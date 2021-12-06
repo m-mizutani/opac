@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/m-mizutani/goerr"
-	"google.golang.org/api/idtoken"
 )
 
 type httpClient interface {
@@ -17,15 +16,16 @@ type httpClient interface {
 }
 
 type Client struct {
-	baseURL         string
-	client          httpClient
-	enableGoogleIAP bool
+	baseURL     string
+	client      httpClient
+	httpRequest HTTPRequest
 }
 
 func New(baseURL string, options ...Option) (*Client, error) {
 	client := &Client{
-		baseURL: strings.TrimRight(baseURL, "/"),
-		client:  &http.Client{},
+		baseURL:     strings.TrimRight(baseURL, "/"),
+		client:      &http.Client{},
+		httpRequest: httpRequest,
 	}
 
 	for _, opt := range options {
@@ -37,26 +37,23 @@ func New(baseURL string, options ...Option) (*Client, error) {
 	return client, nil
 }
 
-func (x *Client) request(ctx context.Context, method, url string, data io.Reader, dst interface{}) error {
+func httpRequest(ctx context.Context, method, url string, data io.Reader) (*http.Response, error) {
 	httpReq, err := http.NewRequestWithContext(ctx, method, url, data)
 	if err != nil {
-		return ErrInvalidInput.Wrap(err)
+		return nil, ErrInvalidInput.Wrap(err)
 	}
 
 	if data != nil {
 		httpReq.Header.Add("Content-Type", "application/json")
 	}
 
-	client := x.client
-	if x.enableGoogleIAP {
-		newClient, err := idtoken.NewClient(ctx, url)
-		if err != nil {
-			return goerr.Wrap(err, "failed idtoken.NewClient for GCP IAP").With("url", url)
-		}
-		client = newClient
-	}
+	client := &http.Client{}
 
-	httpResp, err := client.Do(httpReq)
+	return client.Do(httpReq)
+}
+
+func (x *Client) request(ctx context.Context, method, url string, data io.Reader, dst interface{}) error {
+	httpResp, err := x.httpRequest(ctx, method, url, data)
 	if err != nil {
 		return ErrRequestFailed.Wrap(err)
 	}

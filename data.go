@@ -22,7 +22,10 @@ type dataOutput struct {
 }
 
 func (x *Client) GetData(ctx context.Context, req *DataRequest, dst interface{}) error {
-	url := x.baseURL + "/v1/data/" + req.Path
+	url := x.baseURL + "/v1/data"
+	if req.Path != "" {
+		url += "/" + req.Path
+	}
 	method := http.MethodGet
 
 	var data io.Reader
