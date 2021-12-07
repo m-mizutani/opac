@@ -1,19 +1,18 @@
 package opaclient
 
 import (
-	"context"
-	"io"
 	"net/http"
 )
 
 type Option func(client *Client) error
 
-type HTTPRequest func(ctx context.Context, method, url string, data io.Reader) (*http.Response, error)
+type HTTPClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
 
-// OptHTTPRequest sets HTTPRequest sender
-func OptHTTPRequest(f HTTPRequest) Option {
+func WithHTTPClient(c HTTPClient) Option {
 	return func(client *Client) error {
-		client.httpRequest = f
+		client.client = c
 		return nil
 	}
 }

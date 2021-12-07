@@ -11,21 +11,15 @@ import (
 	"github.com/m-mizutani/goerr"
 )
 
-type httpClient interface {
-	Do(*http.Request) (*http.Response, error)
-}
-
 type Client struct {
-	baseURL     string
-	client      httpClient
-	httpRequest HTTPRequest
+	baseURL string
+	client  HTTPClient
 }
 
 func New(baseURL string, options ...Option) (*Client, error) {
 	client := &Client{
-		baseURL:     strings.TrimRight(baseURL, "/"),
-		client:      &http.Client{},
-		httpRequest: httpRequest,
+		baseURL: strings.TrimRight(baseURL, "/"),
+		client:  &http.Client{},
 	}
 
 	for _, opt := range options {
@@ -37,23 +31,17 @@ func New(baseURL string, options ...Option) (*Client, error) {
 	return client, nil
 }
 
-func httpRequest(ctx context.Context, method, url string, data io.Reader) (*http.Response, error) {
-	httpReq, err := http.NewRequestWithContext(ctx, method, url, data)
+func (x *Client) request(ctx context.Context, method, url string, data io.Reader, dst interface{}) error {
+	req, err := http.NewRequestWithContext(ctx, method, url, data)
 	if err != nil {
-		return nil, ErrInvalidInput.Wrap(err)
+		return ErrInvalidInput.Wrap(err)
 	}
 
 	if data != nil {
-		httpReq.Header.Add("Content-Type", "application/json")
+		req.Header.Add("Content-Type", "application/json")
 	}
 
-	client := &http.Client{}
-
-	return client.Do(httpReq)
-}
-
-func (x *Client) request(ctx context.Context, method, url string, data io.Reader, dst interface{}) error {
-	httpResp, err := x.httpRequest(ctx, method, url, data)
+	httpResp, err := x.client.Do(req)
 	if err != nil {
 		return ErrRequestFailed.Wrap(err)
 	}
