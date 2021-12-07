@@ -12,14 +12,14 @@ import (
 )
 
 type Client struct {
-	baseURL string
-	client  HTTPClient
+	baseURL    string
+	httpClient HTTPClient
 }
 
 func New(baseURL string, options ...Option) (*Client, error) {
 	client := &Client{
-		baseURL: strings.TrimRight(baseURL, "/"),
-		client:  &http.Client{},
+		baseURL:    strings.TrimRight(baseURL, "/"),
+		httpClient: &http.Client{},
 	}
 
 	for _, opt := range options {
@@ -41,7 +41,7 @@ func (x *Client) request(ctx context.Context, method, url string, data io.Reader
 		req.Header.Add("Content-Type", "application/json")
 	}
 
-	httpResp, err := x.client.Do(req)
+	httpResp, err := x.httpClient.Do(req)
 	if err != nil {
 		return ErrRequestFailed.Wrap(err)
 	}

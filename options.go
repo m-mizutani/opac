@@ -10,9 +10,9 @@ type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-func WithHTTPClient(c HTTPClient) Option {
+func WithHTTPClient(httpClient HTTPClient) Option {
 	return func(client *Client) error {
-		client.client = c
+		client.httpClient = httpClient
 		return nil
 	}
 }
