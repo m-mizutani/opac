@@ -1,4 +1,4 @@
-package opaclient_test
+package opac_test
 
 import (
 	"bytes"
@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"testing"
 
-	opaclient "github.com/m-mizutani/opa-go-client"
+	opac "github.com/m-mizutani/opac"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -40,10 +40,10 @@ func TestHTTPRequest(t *testing.T) {
 		},
 	}
 
-	client, err := opaclient.New("https://example.com", opaclient.WithHTTPClient(dummy))
+	client, err := opac.New("https://example.com", opac.WithHTTPClient(dummy))
 	require.NoError(t, err)
 	var out interface{}
-	require.NoError(t, client.GetData(context.Background(), &opaclient.DataRequest{
+	require.NoError(t, client.GetData(context.Background(), &opac.DataRequest{
 		Input: map[string]string{
 			"user": "blue",
 		},

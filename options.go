@@ -1,4 +1,4 @@
-package opaclient
+package opac
 
 import (
 	"net/http"

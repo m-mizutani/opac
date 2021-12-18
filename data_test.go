@@ -1,10 +1,10 @@
-package opaclient_test
+package opac_test
 
 import (
 	"context"
 	"testing"
 
-	opaclient "github.com/m-mizutani/opa-go-client"
+	opac "github.com/m-mizutani/opac"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -24,7 +24,7 @@ func TestDataRequest(t *testing.T) {
 
 	t.Run("GET example", func(t *testing.T) {
 		var result exampleResult
-		require.NoError(t, client.GetData(ctx, &opaclient.DataRequest{
+		require.NoError(t, client.GetData(ctx, &opac.DataRequest{
 			Path: "example",
 		}, &result))
 		assert.False(t, result.Allowed)
@@ -33,7 +33,7 @@ func TestDataRequest(t *testing.T) {
 
 	t.Run("GET example/mydata", func(t *testing.T) {
 		var result string
-		require.NoError(t, client.GetData(ctx, &opaclient.DataRequest{
+		require.NoError(t, client.GetData(ctx, &opac.DataRequest{
 			Path: "example/mydata",
 		}, &result))
 		assert.Equal(t, "orange", result)
@@ -41,7 +41,7 @@ func TestDataRequest(t *testing.T) {
 
 	t.Run("POST example/mydata", func(t *testing.T) {
 		var result exampleResult
-		req := &opaclient.DataRequest{
+		req := &opac.DataRequest{
 			Input: exampleRequest{
 				User: "blue",
 			},

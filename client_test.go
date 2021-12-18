@@ -1,4 +1,4 @@
-package opaclient_test
+package opac_test
 
 import (
 	"context"
@@ -6,17 +6,17 @@ import (
 	"os"
 	"testing"
 
-	opaclient "github.com/m-mizutani/opa-go-client"
+	opac "github.com/m-mizutani/opac"
 	"github.com/stretchr/testify/require"
 )
 
 func ExampleClient() {
-	client, err := opaclient.New("http://localhost:8181")
+	client, err := opac.New("http://localhost:8181")
 	if err != nil {
 		panic(err)
 	}
 
-	req := opaclient.DataRequest{
+	req := opac.DataRequest{
 		Path: "example/policy",
 		Input: map[string]string{
 			"user": "m-mizutani",
@@ -33,13 +33,13 @@ func ExampleClient() {
 	fmt.Println("allowed? =>", resp.Allowed)
 }
 
-func setupClient(t *testing.T) *opaclient.Client {
+func setupClient(t *testing.T) *opac.Client {
 	url, ok := os.LookupEnv("OPA_BASE_URL")
 	if !ok {
 		t.Skip("OPA_BASE_URL is not set")
 	}
 
-	client, err := opaclient.New(url)
+	client, err := opac.New(url)
 	require.NoError(t, err)
 	return client
 }

@@ -1,4 +1,4 @@
-package opaclient_test
+package opac_test
 
 import (
 	"context"

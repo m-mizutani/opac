@@ -1,4 +1,4 @@
-package opaclient
+package opac
 
 import (
 	"context"
@@ -31,14 +31,31 @@ func New(baseURL string, options ...Option) (*Client, error) {
 	return client, nil
 }
 
-func (x *Client) request(ctx context.Context, method, url string, data io.Reader, dst interface{}) error {
-	req, err := http.NewRequestWithContext(ctx, method, url, data)
+type contentType string
+
+const (
+	contetJSON contentType = "application/json"
+	contetText contentType = "text/plain"
+)
+
+type body struct {
+	Reader io.Reader
+	Type   contentType
+}
+
+func (x *Client) request(ctx context.Context, method, url string, data *body, dst interface{}) error {
+	var r io.Reader
+	if data != nil {
+		r = data.Reader
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, url, r)
 	if err != nil {
 		return ErrInvalidInput.Wrap(err)
 	}
 
 	if data != nil {
-		req.Header.Add("Content-Type", "application/json")
+		req.Header.Add("Content-Type", string(data.Type))
 	}
 
 	httpResp, err := x.httpClient.Do(req)
@@ -54,13 +71,15 @@ func (x *Client) request(ctx context.Context, method, url string, data io.Reader
 			With("body", string(body))
 	}
 
-	raw, err := ioutil.ReadAll(httpResp.Body)
-	if err != nil {
-		return ErrUnexpectedResp.Wrap(err).With("body", string(raw))
-	}
+	if dst != nil {
+		raw, err := ioutil.ReadAll(httpResp.Body)
+		if err != nil {
+			return ErrUnexpectedResp.Wrap(err).With("body", string(raw))
+		}
 
-	if err := json.Unmarshal(raw, dst); err != nil {
-		return ErrUnexpectedResp.Wrap(err).With("body", string(raw))
+		if err := json.Unmarshal(raw, dst); err != nil {
+			return ErrUnexpectedResp.Wrap(err).With("body", string(raw))
+		}
 	}
 
 	return nil

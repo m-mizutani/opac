@@ -1,16 +1,16 @@
-# OPA Go Client
+# opac: OPA client library and command in Go
 
-Unofficial [OPA](https://github.com/open-policy-agent/opa) HTTP Client in Go.
+Unofficial [OPA](https://github.com/open-policy-agent/opa) HTTP client library and command in Go.
 
 ## Usage
 
 ```go
-client, err := opaclient.New("http://localhost:8181")
+client, err := opac.New("http://localhost:8181")
 if err != nil {
     panic(err)
 }
 
-req := opaclient.DataRequest{
+req := opac.DataRequest{
     Path: "example/policy",
     Input: map[string]string{
         "user": "m-mizutani",
