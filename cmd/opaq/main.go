@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"reflect"
 
 	"github.com/m-mizutani/goerr"
 	"github.com/m-mizutani/opac"
@@ -16,7 +17,7 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-var logger *zlog.Logger
+var logger = zlog.New()
 
 var (
 	errInvalidConfiguration = goerr.New("invalid configuration")
@@ -67,6 +68,7 @@ func cmd(args []string) error {
 			&cli.StringFlag{
 				Name:        "url",
 				Aliases:     []string{"u"},
+				EnvVars:     []string{"OPAQ_URL"},
 				Required:    true,
 				Usage:       "base URL of OPA server",
 				Destination: &cfg.BaseURL,
@@ -106,7 +108,7 @@ func cmd(args []string) error {
 			},
 		},
 
-		Before: func(c *cli.Context) error {
+		Before: func(_ *cli.Context) error {
 			l, err := zlog.NewWithError(
 				zlog.WithLogLevel(cfg.LogLevel),
 				zlog.WithFilters(filter.Tag()),
@@ -120,74 +122,13 @@ func cmd(args []string) error {
 
 			return nil
 		},
-		After: func(c *cli.Context) error {
+		After: func(_ *cli.Context) error {
 			logger.Debug("exiting")
 			return nil
 		},
 
-		Action: func(c *cli.Context) error {
-			logger.With("config", cfg).Debug("Starting inquiry")
-			if cfg.InputData != "" && cfg.InputFile != "" {
-				return goerr.Wrap(errInvalidConfiguration, "either one of input-data and input-file is allowed")
-			}
-
-			req := &opac.DataRequest{
-				Path: cfg.path,
-			}
-
-			var data []byte
-			if cfg.InputData != "" {
-				data = []byte(cfg.InputData)
-			}
-			if cfg.InputFile != "" {
-				raw, err := ioutil.ReadFile(cfg.InputFile)
-				if err != nil {
-					return goerr.Wrap(err)
-				}
-				data = raw
-			}
-
-			if len(data) > 0 {
-				var obj interface{}
-				if err := json.Unmarshal(data, &obj); err != nil {
-					return goerr.Wrap(err).With("data", data)
-				}
-				req.Input = obj
-			}
-
-			var options []opac.Option
-			if cfg.AuthBearer != "" {
-				options = append(options, opac.WithHTTPClient(&authClient{
-					auth: cfg.AuthBearer,
-				}))
-			}
-
-			opa, err := opac.New(cfg.BaseURL, options...)
-			if err != nil {
-				return goerr.Wrap(err)
-			}
-
-			logger.With("req", req).Debug("Sending API request")
-			ctx := context.Background()
-			var out map[string]interface{}
-			if err := opa.GetData(ctx, req, &out); err != nil {
-				return err
-			}
-
-			raw, err := json.MarshalIndent(out, "", "  ")
-			if err != nil {
-				return goerr.Wrap(err).With("out", out)
-			}
-			fmt.Println(string(raw))
-
-			if cfg.FailDefined && len(out) > 0 {
-				return errExitWithNonZero
-			}
-			if cfg.FailUndefined && len(out) == 0 {
-				return errExitWithNonZero
-			}
-
-			return nil
+		Action: func(_ *cli.Context) error {
+			return handler(&cfg)
 		},
 	}
 
@@ -196,11 +137,91 @@ func cmd(args []string) error {
 		if errors.Is(errExitWithNonZero, err) {
 			return err
 		}
-		logger.Err(err).Error("failed")
+		logger.Error(err.Error())
+		logger.With("config", cfg).Err(err).Debug("error detail")
 		return err
 	}
 
 	return nil
+}
+
+func handler(cfg *config) error {
+	logger.With("config", cfg).Debug("Starting inquiry")
+
+	if cfg.InputData != "" && cfg.InputFile != "" {
+		return goerr.Wrap(errInvalidConfiguration, "either one of input-data and input-file is allowed")
+	}
+
+	req := &opac.DataRequest{
+		Path: cfg.path,
+	}
+
+	var data []byte
+	if cfg.InputData != "" {
+		data = []byte(cfg.InputData)
+	}
+	if cfg.InputFile != "" {
+		raw, err := ioutil.ReadFile(cfg.InputFile)
+		if err != nil {
+			return goerr.Wrap(err)
+		}
+		data = raw
+	}
+
+	if len(data) > 0 {
+		var obj interface{}
+		if err := json.Unmarshal(data, &obj); err != nil {
+			return goerr.Wrap(err).With("data", data)
+		}
+		req.Input = obj
+	}
+
+	var options []opac.Option
+	if cfg.AuthBearer != "" {
+		options = append(options, opac.WithHTTPClient(&authClient{
+			auth: cfg.AuthBearer,
+		}))
+	}
+
+	opa, err := opac.New(cfg.BaseURL, options...)
+	if err != nil {
+		return goerr.Wrap(err)
+	}
+
+	logger.With("req", req).Debug("Sending API request")
+	ctx := context.Background()
+	var out interface{}
+	if err := opa.GetData(ctx, req, &out); err != nil {
+		return err
+	}
+
+	raw, err := json.MarshalIndent(out, "", "  ")
+	if err != nil {
+		return goerr.Wrap(err).With("out", out)
+	}
+	fmt.Println(string(raw))
+
+	if cfg.FailDefined && !isEmpty(out) {
+		return errExitWithNonZero
+	}
+	if cfg.FailUndefined && isEmpty(out) {
+		return errExitWithNonZero
+	}
+
+	return nil
+}
+
+func isEmpty(out interface{}) bool {
+	if out == nil {
+		return true
+	}
+	switch reflect.TypeOf(out).Kind() {
+	case reflect.Ptr:
+		return reflect.ValueOf(out).IsNil()
+	case reflect.Map, reflect.Array, reflect.Slice:
+		return reflect.ValueOf(out).Len() == 0
+	}
+	return false
 }
 
 func main() {

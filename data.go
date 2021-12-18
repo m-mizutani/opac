@@ -55,6 +55,7 @@ func (x *Client) GetData(ctx context.Context, req *DataRequest, dst interface{})
 	if resp.Result == nil {
 		return nil
 	}
+
 	raw, err := json.Marshal(resp.Result)
 	if err != nil {
 		return ErrUnexpectedResp.Wrap(err).With("result", resp.Result)

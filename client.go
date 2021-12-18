@@ -9,7 +9,10 @@ import (
 	"strings"
 
 	"github.com/m-mizutani/goerr"
+	"github.com/m-mizutani/zlog"
 )
+
+var logger = zlog.New()
 
 type Client struct {
 	baseURL    string
