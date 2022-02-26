@@ -135,3 +135,21 @@ func TestWithMock(t *testing.T) {
 	assert.False(t, foo.IsAllow("orange"))
 }
 ```
+
+## Options
+
+### for `NewRemote`
+
+- `WithHTTPClient`: Replace `http.DefaultClient` with own `HTTPClient` instance.
+- `WithHTTPHeader`: Add HTTP header. It can be added multiply.
+- `EnableRemoteLogging`: Enable debug logging
+
+### for `NewLocal`
+
+- `WithPackage`: Specify package name like "example.my_policy"
+- `EnableLocalLogging`: Enable debug logging
+- `WithRegoPrint`: Output `print()` result to `io.Writer`
+
+## License
+
+Apache License 2.0

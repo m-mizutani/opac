@@ -10,12 +10,14 @@ import (
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/go-ozzo/ozzo-validation/v4/is"
 	"github.com/m-mizutani/goerr"
+	"github.com/m-mizutani/zlog"
 )
 
 type Remote struct {
 	url         string
 	httpHeaders map[string][]string
 	httpClient  HTTPClient
+	logger      *zlog.Logger
 }
 
 type RemoteOption func(x *Remote)
@@ -33,10 +35,16 @@ func NewRemote(url string, options ...RemoteOption) (*Remote, error) {
 		url:         url,
 		httpHeaders: make(map[string][]string),
 		httpClient:  http.DefaultClient,
+		logger:      zlog.New(),
 	}
 	for _, opt := range options {
 		opt(client)
 	}
+
+	client.logger.
+		With("url", client.url).
+		With("headers", client.httpHeaders).
+		Debug("created remote client")
 
 	return client, nil
 }
@@ -53,6 +61,12 @@ func WithHTTPHeader(name, value string) RemoteOption {
 	}
 }
 
+func EnableRemoteLogging() RemoteOption {
+	return func(x *Remote) {
+		x.logger = zlog.New(zlog.WithLogLevel("debug"))
+	}
+}
+
 type httpInput struct {
 	Input interface{} `json:"input"`
 }
@@ -62,6 +76,8 @@ type httpOutput struct {
 }
 
 func (x *Remote) Query(ctx context.Context, in interface{}, out interface{}) error {
+	x.logger.With("in", in).Debug("start Remote.Query")
+
 	input := httpInput{
 		Input: in,
 	}
@@ -111,6 +127,8 @@ func (x *Remote) Query(ctx context.Context, in interface{}, out interface{}) err
 	if err := json.Unmarshal(rawOutput, out); err != nil {
 		return goerr.Wrap(err, "fail to unmarshal OPA server result to out")
 	}
+
+	x.logger.With("response body", string(body)).Debug("done Remote.Query")
 
 	return nil
 }

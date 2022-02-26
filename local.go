@@ -3,6 +3,8 @@ package opac
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -18,6 +20,7 @@ type Local struct {
 	compiler *ast.Compiler
 	query    string
 	logger   *zlog.Logger
+	print    io.Writer
 }
 
 type LocalOption func(x *Local)
@@ -25,6 +28,18 @@ type LocalOption func(x *Local)
 func WithPackage(pkg string) LocalOption {
 	return func(x *Local) {
 		x.query = "data." + pkg
+	}
+}
+
+func EnableLocalLogging() LocalOption {
+	return func(x *Local) {
+		x.logger = zlog.New(zlog.WithLogLevel("debug"))
+	}
+}
+
+func WithRegoPrint(w io.Writer) LocalOption {
+	return func(x *Local) {
+		x.print = w
 	}
 }
 
@@ -56,7 +71,9 @@ func NewLocal(path string, options ...LocalOption) (*Local, error) {
 		return nil, goerr.Wrap(err)
 	}
 
-	compiler, err := ast.CompileModules(policies)
+	compiler, err := ast.CompileModulesWithOpt(policies, ast.CompileOpts{
+		EnablePrintStatements: true,
+	})
 	if err != nil {
 		return nil, goerr.Wrap(err)
 	}
@@ -69,31 +86,38 @@ func NewLocal(path string, options ...LocalOption) (*Local, error) {
 	for _, opt := range options {
 		opt(client)
 	}
+	client.logger.
+		With("query", client.query).
+		With("files", loadedFiles).
+		Debug("created local client")
 
 	return client, nil
 }
 
 type printLogger struct {
-	logger *zlog.Logger
+	w io.Writer
 }
 
 func (x *printLogger) Print(ctx print.Context, msg string) error {
-	x.logger.With("msg", msg).With("ctx", ctx).Debug("print")
+	if x.w != nil {
+		fmt.Fprintf(x.w, "%s:%d %s", ctx.Location.File, ctx.Location.Row, msg)
+	}
 	return nil
 }
 
 func (x *Local) Query(ctx context.Context, in interface{}, out interface{}) error {
-	x.logger.With("in", in).Trace("start Local.Eval")
-	rego := rego.New(
+	x.logger.With("in", in).Debug("start Local.Query")
+
+	q := rego.New(
 		rego.Query(x.query),
 		rego.PrintHook(&printLogger{
-			logger: x.logger,
+			w: x.print,
 		}),
 		rego.Compiler(x.compiler),
 		rego.Input(in),
 	)
 
-	rs, err := rego.Eval(ctx)
+	rs, err := q.Eval(ctx)
 
 	if err != nil {
 		return goerr.Wrap(err, "fail to eval local policy").With("input", in)
@@ -102,7 +126,7 @@ func (x *Local) Query(ctx context.Context, in interface{}, out interface{}) erro
 		return goerr.Wrap(ErrNoEvalResult)
 	}
 
-	x.logger.With("rs", rs).Trace("got a result of rego.Eval")
+	x.logger.With("rs", rs).Debug("got a result of rego.Eval")
 
 	raw, err := json.Marshal(rs[0].Expressions[0].Value)
 	if err != nil {
@@ -112,7 +136,7 @@ func (x *Local) Query(ctx context.Context, in interface{}, out interface{}) erro
 		return goerr.Wrap(err, "fail to unmarshal a result of rego.Eval to out").With("rs", rs)
 	}
 
-	x.logger.With("rs", rs).Trace("done Local.Eval")
+	x.logger.With("result set", rs).Debug("done Local.Query")
 
 	return nil
 }

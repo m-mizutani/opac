@@ -1,6 +1,7 @@
 package opac_test
 
 import (
+	"bytes"
 	"context"
 	"testing"
 
@@ -53,6 +54,21 @@ func TestLocalClient(t *testing.T) {
 		assert.Equal(t, true, out["allow"])
 		assert.Nil(t, out["color"])
 		assert.Nil(t, out["number"])
+	})
 
+	t.Run("with print", func(t *testing.T) {
+		var buf bytes.Buffer
+		client, err := opac.NewLocal("./testdata/print.rego",
+			opac.WithPackage("print"),
+			opac.WithRegoPrint(&buf),
+		)
+		require.NoError(t, err)
+		in := map[string]string{
+			"user": "blue",
+		}
+		out := map[string]interface{}{}
+		require.NoError(t, client.Query(context.Background(), in, &out))
+		assert.Equal(t, true, out["allow"])
+		assert.Equal(t, "./testdata/print.rego:4 blue", buf.String())
 	})
 }
