@@ -46,7 +46,7 @@ func WithDir(dirPath string) LocalOption {
 	}
 }
 
-func WithPolicy(name, policy string) LocalOption {
+func WithPolicyData(name, policy string) LocalOption {
 	return func(x *Local) {
 		x.policies[name] = policy
 	}
@@ -115,6 +115,10 @@ func NewLocal(options ...LocalOption) (*Local, error) {
 
 	for k, v := range client.policies {
 		policies[k] = v
+	}
+
+	if len(policies) == 0 {
+		return nil, goerr.Wrap(ErrNoPolicyData)
 	}
 
 	compiler, err := ast.CompileModulesWithOpt(policies, ast.CompileOpts{

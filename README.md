@@ -147,6 +147,9 @@ func TestWithMock(t *testing.T) {
 
 ### for `NewLocal`
 
+- `WithFile`: Specify a policy file
+- `WithDir`: Specify a policy file directory (search recursively)
+- `WithPolicyData`: Specify a policy data
 - `WithPackage`: Specify package name like "example.my_policy"
 - `EnableLocalLogging`: Enable debug logging
 - `WithRegoPrint`: Output `print()` result to `io.Writer`

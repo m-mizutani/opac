@@ -75,4 +75,27 @@ func TestLocalClient(t *testing.T) {
 		assert.Equal(t, true, out["allow"])
 		assert.Equal(t, "testdata/print.rego:4 blue", buf.String())
 	})
+
+	t.Run("with policy data", func(t *testing.T) {
+		client, err := opac.NewLocal(
+			opac.WithPolicyData("mypolicy", `package color
+			allow {
+				input.color == "orange"
+			}`),
+			opac.WithPackage("color"),
+		)
+		require.NoError(t, err)
+		in := map[string]string{
+			"color": "orange",
+		}
+		out := map[string]interface{}{}
+		require.NoError(t, client.Query(context.Background(), in, &out))
+		assert.Equal(t, true, out["allow"])
+	})
+
+	t.Run("failed if no policy data", func(t *testing.T) {
+		client, err := opac.NewLocal()
+		assert.ErrorIs(t, err, opac.ErrNoPolicyData)
+		assert.Nil(t, client)
+	})
 }
