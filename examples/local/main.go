@@ -8,7 +8,8 @@ import (
 )
 
 func main() {
-	client, err := opac.NewLocal("./examples/local/policy.rego",
+	client, err := opac.NewLocal(
+		opac.WithFile("./examples/local/policy.rego"),
 		opac.WithPackage("example"),
 	)
 	if err != nil {

@@ -4,7 +4,7 @@ Unofficial OPA/Rego inquiry library for OPA server, local Rego file and in-memor
 
 ## Motivation
 
-[Rego](https://www.openpolicyagent.org/docs/latest/policy-language) is general policy language for various purpose.
+[Rego](https://www.openpolicyagent.org/docs/latest/policy-language) is general policy language and various Rego evaluation methods are provided by official. In programing way
 
 ## Example
 
@@ -42,7 +42,8 @@ func main() {
 
 ```go
 func main() {
-	client, err := opac.NewLocal("./examples/local/policy.rego",
+	client, err := opac.NewLocal(
+		opac.WithFile("./examples/local/policy.rego"),
 		opac.WithPackage("example"),
 	)
 	if err != nil {

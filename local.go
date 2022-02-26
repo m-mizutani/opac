@@ -16,7 +16,16 @@ import (
 	"github.com/open-policy-agent/opa/topdown/print"
 )
 
+type policyData struct {
+	Name   string
+	Policy string
+}
+
 type Local struct {
+	flies    []string
+	dirs     []string
+	policies map[string]string
+
 	compiler *ast.Compiler
 	query    string
 	logger   *zlog.Logger
@@ -24,6 +33,24 @@ type Local struct {
 }
 
 type LocalOption func(x *Local)
+
+func WithFile(filePath string) LocalOption {
+	return func(x *Local) {
+		x.flies = append(x.flies, filepath.Clean(filePath))
+	}
+}
+
+func WithDir(dirPath string) LocalOption {
+	return func(x *Local) {
+		x.dirs = append(x.dirs, filepath.Clean(dirPath))
+	}
+}
+
+func WithPolicy(name, policy string) LocalOption {
+	return func(x *Local) {
+		x.policies[name] = policy
+	}
+}
 
 func WithPackage(pkg string) LocalOption {
 	return func(x *Local) {
@@ -43,32 +70,51 @@ func WithRegoPrint(w io.Writer) LocalOption {
 	}
 }
 
-func NewLocal(path string, options ...LocalOption) (*Local, error) {
+func NewLocal(options ...LocalOption) (*Local, error) {
+	client := &Local{
+		query:    "data",
+		logger:   zlog.New(),
+		policies: make(map[string]string),
+	}
+	for _, opt := range options {
+		opt(client)
+	}
+
 	policies := make(map[string]string)
-	var loadedFiles []string
-	err := filepath.WalkDir(path, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return ErrReadRegoDir.Wrap(err).With("path", path)
-		}
-		if d.IsDir() {
+	var targetFiles []string
+	for _, dirPath := range client.dirs {
+		err := filepath.WalkDir(dirPath, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return ErrReadRegoDir.Wrap(err).With("path", path)
+			}
+			if d.IsDir() {
+				return nil
+			}
+			if filepath.Ext(path) != ".rego" {
+				return nil
+			}
+
+			targetFiles = append(targetFiles, path)
+
 			return nil
-		}
-		if filepath.Ext(path) != ".rego" {
-			return nil
-		}
-
-		raw, err := os.ReadFile(filepath.Clean(path))
+		})
 		if err != nil {
-			return ErrReadRegoFile.Wrap(err).With("path", path)
+			return nil, goerr.Wrap(err)
+		}
+	}
+	targetFiles = append(targetFiles, client.flies...)
+
+	for _, filePath := range targetFiles {
+		raw, err := os.ReadFile(filepath.Clean(filePath))
+		if err != nil {
+			return nil, ErrReadRegoFile.Wrap(err).With("path", filePath)
 		}
 
-		policies[path] = string(raw)
-		loadedFiles = append(loadedFiles, path)
+		policies[filePath] = string(raw)
+	}
 
-		return nil
-	})
-	if err != nil {
-		return nil, goerr.Wrap(err)
+	for k, v := range client.policies {
+		policies[k] = v
 	}
 
 	compiler, err := ast.CompileModulesWithOpt(policies, ast.CompileOpts{
@@ -77,18 +123,11 @@ func NewLocal(path string, options ...LocalOption) (*Local, error) {
 	if err != nil {
 		return nil, goerr.Wrap(err)
 	}
+	client.compiler = compiler
 
-	client := &Local{
-		compiler: compiler,
-		query:    "data",
-		logger:   zlog.New(),
-	}
-	for _, opt := range options {
-		opt(client)
-	}
 	client.logger.
 		With("query", client.query).
-		With("files", loadedFiles).
+		With("loaded files", targetFiles).
 		Debug("created local client")
 
 	return client, nil
