@@ -13,6 +13,7 @@ import (
 	"github.com/m-mizutani/zlog"
 )
 
+// Remote sends a HTTP/HTTPS request to OPA server.
 type Remote struct {
 	url         string
 	httpHeaders map[string][]string
@@ -20,12 +21,15 @@ type Remote struct {
 	logger      *zlog.Logger
 }
 
+// RemoteOption is Option of functional option pattern for Remote
 type RemoteOption func(x *Remote)
 
+// HTTPClient is interface of http.Client for replancement with owned HTTP client
 type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
+// NewRemote creates a new Local client.
 func NewRemote(url string, options ...RemoteOption) (*Remote, error) {
 	if err := validation.Validate(url, validation.Required, is.URL); err != nil {
 		return nil, goerr.Wrap(err, "invalid URL for remote policy")
@@ -49,19 +53,22 @@ func NewRemote(url string, options ...RemoteOption) (*Remote, error) {
 	return client, nil
 }
 
+// WithHTTPClient replaces `http.DefaultClient` with own `HTTPClient` instance.
 func WithHTTPClient(client HTTPClient) RemoteOption {
 	return func(x *Remote) {
 		x.httpClient = client
 	}
 }
 
+// WithHTTPHeader adds HTTP header. It can be added multiply.
 func WithHTTPHeader(name, value string) RemoteOption {
 	return func(x *Remote) {
 		x.httpHeaders[name] = append(x.httpHeaders[name], value)
 	}
 }
 
-func EnableRemoteLogging() RemoteOption {
+// WithLoggingRemote enables logger for debug
+func WithLoggingRemote() RemoteOption {
 	return func(x *Remote) {
 		x.logger = zlog.New(zlog.WithLogLevel("debug"))
 	}
@@ -75,6 +82,7 @@ type httpOutput struct {
 	Result interface{} `json:"result"`
 }
 
+// Query evaluates policy with `input` data. The result will be written to `out`. `out` must be pointer of instance.
 func (x *Remote) Query(ctx context.Context, in interface{}, out interface{}) error {
 	x.logger.With("in", in).Debug("start Remote.Query")
 

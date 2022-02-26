@@ -16,6 +16,7 @@ import (
 	"github.com/open-policy-agent/opa/topdown/print"
 )
 
+// Local loads and compile local policy data and evaluate input data with them.
 type Local struct {
 	flies    []string
 	dirs     []string
@@ -27,44 +28,52 @@ type Local struct {
 	print    io.Writer
 }
 
+// LocalOption is Option of functional option pattern for Local
 type LocalOption func(x *Local)
 
+// WithFile specifies .rego policy file path
 func WithFile(filePath string) LocalOption {
 	return func(x *Local) {
 		x.flies = append(x.flies, filepath.Clean(filePath))
 	}
 }
 
+// WithDir specifies directory path of .rego policy. Import policy files recursively.
 func WithDir(dirPath string) LocalOption {
 	return func(x *Local) {
 		x.dirs = append(x.dirs, filepath.Clean(dirPath))
 	}
 }
 
+// WithPolicyData specifies raw policy data with name. If the `name` conflicts with file path loaded by WithFile or WithDir, the policy overwrites data loaded by WithFile or WithDir.
 func WithPolicyData(name, policy string) LocalOption {
 	return func(x *Local) {
 		x.policies[name] = policy
 	}
 }
 
+// WithPackage specifies using package name. e.g. "example.my_policy"
 func WithPackage(pkg string) LocalOption {
 	return func(x *Local) {
 		x.query = "data." + pkg
 	}
 }
 
-func EnableLocalLogging() LocalOption {
+// WithLoggingLocal enables logger for debug
+func WithLoggingLocal() LocalOption {
 	return func(x *Local) {
 		x.logger = zlog.New(zlog.WithLogLevel("debug"))
 	}
 }
 
+// WithRegoPrint enables OPA print function and output to `w`
 func WithRegoPrint(w io.Writer) LocalOption {
 	return func(x *Local) {
 		x.print = w
 	}
 }
 
+// NewLocal creates a new Local client. It requires one or more WithFile, WithDir or WithPolicyData.
 func NewLocal(options ...LocalOption) (*Local, error) {
 	client := &Local{
 		query:    "data",
@@ -143,8 +152,9 @@ func (x *printLogger) Print(ctx print.Context, msg string) error {
 	return nil
 }
 
-func (x *Local) Query(ctx context.Context, in interface{}, out interface{}) error {
-	x.logger.With("in", in).Debug("start Local.Query")
+// Query evaluates policy with `input` data. The result will be written to `out`. `out` must be pointer of instance.
+func (x *Local) Query(ctx context.Context, input interface{}, output interface{}) error {
+	x.logger.With("in", input).Debug("start Local.Query")
 
 	q := rego.New(
 		rego.Query(x.query),
@@ -152,13 +162,13 @@ func (x *Local) Query(ctx context.Context, in interface{}, out interface{}) erro
 			w: x.print,
 		}),
 		rego.Compiler(x.compiler),
-		rego.Input(in),
+		rego.Input(input),
 	)
 
 	rs, err := q.Eval(ctx)
 
 	if err != nil {
-		return goerr.Wrap(err, "fail to eval local policy").With("input", in)
+		return goerr.Wrap(err, "fail to eval local policy").With("input", input)
 	}
 	if len(rs) == 0 || len(rs[0].Expressions) == 0 {
 		return goerr.Wrap(ErrNoEvalResult)
@@ -170,7 +180,7 @@ func (x *Local) Query(ctx context.Context, in interface{}, out interface{}) erro
 	if err != nil {
 		return goerr.Wrap(err, "fail to marshal a result of rego.Eval").With("rs", rs)
 	}
-	if err := json.Unmarshal(raw, out); err != nil {
+	if err := json.Unmarshal(raw, output); err != nil {
 		return goerr.Wrap(err, "fail to unmarshal a result of rego.Eval to out").With("rs", rs)
 	}
 

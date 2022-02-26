@@ -1,10 +1,18 @@
 # opac: OPA/Rego inquiry library [![Test](https://github.com/m-mizutani/opac/actions/workflows/test.yml/badge.svg)](https://github.com/m-mizutani/opac/actions/workflows/test.yml) [![Vuln scan](https://github.com/m-mizutani/opac/actions/workflows/trivy.yml/badge.svg)](https://github.com/m-mizutani/opac/actions/workflows/trivy.yml) [![Sec Scan](https://github.com/m-mizutani/opac/actions/workflows/gosec.yml/badge.svg)](https://github.com/m-mizutani/opac/actions/workflows/gosec.yml) [![Go Reference](https://pkg.go.dev/badge/github.com/m-mizutani/opac.svg)](https://pkg.go.dev/github.com/m-mizutani/opac)
 
-Unofficial OPA/Rego inquiry library for OPA server, local Rego file and in-memory Rego data.
+Unofficial Rego evaluation API for OPA server, local Rego file and in-memory Rego data.
 
 ## Motivation
 
-[Rego](https://www.openpolicyagent.org/docs/latest/policy-language) is general policy language and various Rego evaluation methods are provided by official. In programing way
+[Rego](https://www.openpolicyagent.org/docs/latest/policy-language) is general policy language and various evaluation methods for Rego are provided by official. In programing way, there are three major to evaluate policy.
+
+- Inquiry to OPA server
+- Use local policy file(s)
+- Use in-memory policy data (e.g. from environment variable)
+
+A software developer can choose a appropriate way according to own requirements. However, in many case, an end user also want to choose evaluation method by each runtime environment. Therefore, unified policy evaluation method may be useful for developer to integrate with Rego.
+
+`opac` provides abstracted API to evaluate Rego with OPA server, local policy file and in-memory text data. A developer can easily implement switching evaluation method mechanism by option chosen by end user.
 
 ## Example
 
@@ -143,15 +151,17 @@ func TestWithMock(t *testing.T) {
 
 - `WithHTTPClient`: Replace `http.DefaultClient` with own `HTTPClient` instance.
 - `WithHTTPHeader`: Add HTTP header. It can be added multiply.
-- `EnableRemoteLogging`: Enable debug logging
+- `WithLoggingRemote`: Enable debug logging
 
 ### for `NewLocal`
+
+One ore more `WithFile`, `WithDir` or `WithPolicyData` is required.
 
 - `WithFile`: Specify a policy file
 - `WithDir`: Specify a policy file directory (search recursively)
 - `WithPolicyData`: Specify a policy data
 - `WithPackage`: Specify package name like "example.my_policy"
-- `EnableLocalLogging`: Enable debug logging
+- `WithLoggingLocal`: Enable debug logging
 - `WithRegoPrint`: Output `print()` result to `io.Writer`
 
 ## License
