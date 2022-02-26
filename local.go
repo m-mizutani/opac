@@ -16,11 +16,6 @@ import (
 	"github.com/open-policy-agent/opa/topdown/print"
 )
 
-type policyData struct {
-	Name   string
-	Policy string
-}
-
 type Local struct {
 	flies    []string
 	dirs     []string
