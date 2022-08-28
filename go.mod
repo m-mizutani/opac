@@ -6,7 +6,7 @@ require (
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/m-mizutani/goerr v0.1.7
 	github.com/m-mizutani/zlog v0.3.2
-	github.com/open-policy-agent/opa v0.40.0
+	github.com/open-policy-agent/opa v0.38.0
 	github.com/stretchr/testify v1.8.0
 )
 
