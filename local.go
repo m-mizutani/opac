@@ -153,11 +153,13 @@ func (x *printLogger) Print(ctx print.Context, msg string) error {
 }
 
 // Query evaluates policy with `input` data. The result will be written to `out`. `out` must be pointer of instance.
-func (x *Local) Query(ctx context.Context, input interface{}, output interface{}) error {
+func (x *Local) Query(ctx context.Context, input interface{}, output interface{}, options ...QueryOption) error {
 	x.logger.With("in", input).Debug("start Local.Query")
 
+	cfg := newQueryConfig(options...)
+
 	q := rego.New(
-		rego.Query(x.query),
+		rego.Query(x.query+cfg.pkgSuffix),
 		rego.PrintHook(&printLogger{
 			w: x.print,
 		}),

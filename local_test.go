@@ -5,6 +5,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/m-mizutani/gt"
 	"github.com/m-mizutani/opac"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -98,4 +99,22 @@ func TestLocalClient(t *testing.T) {
 		assert.ErrorIs(t, err, opac.ErrNoPolicyData)
 		assert.Nil(t, client)
 	})
+}
+
+func TestWithPackageSuffix(t *testing.T) {
+	policy := `package color.test
+	allow = true
+	`
+	client := gt.R1(opac.NewLocal(
+		opac.WithPolicyData("mypolicy", policy),
+		opac.WithPackage("color"),
+	)).NoError(t)
+
+	var r1 map[string]any
+	gt.NoError(t, client.Query(context.Background(), map[string]string{}, &r1))
+	gt.V(t, r1["allow"]).Nil()
+
+	var r2 map[string]any
+	gt.NoError(t, client.Query(context.Background(), map[string]string{}, &r2, opac.WithPackageSuffix(".test")))
+	gt.V(t, r2["allow"]).Equal(true)
 }

@@ -11,7 +11,7 @@ type Mock struct {
 	mockFunc MockFunc
 }
 
-type MockFunc func(in interface{}) (interface{}, error)
+type MockFunc func(in interface{}, options ...QueryOption) (interface{}, error)
 
 func NewMock(f MockFunc) *Mock {
 	return &Mock{
@@ -19,8 +19,8 @@ func NewMock(f MockFunc) *Mock {
 	}
 }
 
-func (x *Mock) Query(ctx context.Context, in interface{}, out interface{}) error {
-	result, err := x.mockFunc(in)
+func (x *Mock) Query(ctx context.Context, in interface{}, out interface{}, options ...QueryOption) error {
+	result, err := x.mockFunc(in, options...)
 	if err != nil {
 		return err
 	}

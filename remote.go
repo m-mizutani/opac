@@ -83,8 +83,13 @@ type httpOutput struct {
 }
 
 // Query evaluates policy with `input` data. The result will be written to `out`. `out` must be pointer of instance.
-func (x *Remote) Query(ctx context.Context, in interface{}, out interface{}) error {
+func (x *Remote) Query(ctx context.Context, in interface{}, out interface{}, options ...QueryOption) error {
 	x.logger.With("in", in).Debug("start Remote.Query")
+
+	cfg := newQueryConfig(options...)
+	if cfg.pkgSuffix != "" {
+		return goerr.Wrap(ErrInvalidQueryOption, "suffix is not supported for remote inquiry")
+	}
 
 	input := httpInput{
 		Input: in,
