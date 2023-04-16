@@ -90,6 +90,9 @@ func (x *Remote) Query(ctx context.Context, in interface{}, out interface{}, opt
 	if cfg.pkgSuffix != "" {
 		return goerr.Wrap(ErrInvalidQueryOption, "suffix is not supported for remote inquiry")
 	}
+	if cfg.printWriter != nil {
+		return goerr.Wrap(ErrInvalidQueryOption, "printWriter is not supported for remote inquiry")
+	}
 
 	input := httpInput{
 		Input: in,

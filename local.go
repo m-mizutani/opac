@@ -158,10 +158,15 @@ func (x *Local) Query(ctx context.Context, input interface{}, output interface{}
 
 	cfg := newQueryConfig(options...)
 
+	logger := x.print
+	if cfg.printWriter != nil {
+		logger = cfg.printWriter
+	}
+
 	q := rego.New(
 		rego.Query(x.query+cfg.pkgSuffix),
 		rego.PrintHook(&printLogger{
-			w: x.print,
+			w: logger,
 		}),
 		rego.Compiler(x.compiler),
 		rego.Input(input),
