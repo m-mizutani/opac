@@ -40,7 +40,7 @@ func TestRemote(t *testing.T) {
 				do: tc.do,
 			}
 			client := gt.R1(opac.New(
-				opac.SrcRemote(tc.url, opac.WithHTTPClient(mock)),
+				opac.Remote(tc.url, opac.WithHTTPClient(mock)),
 			)).NoError(t)
 			ctx := context.Background()
 			input := map[string]interface{}{
@@ -189,7 +189,7 @@ func TestRemoteWithOPACommand(t *testing.T) {
 
 	time.Sleep(1 * time.Second)
 
-	client := gt.R1(opac.New(opac.SrcRemote("http://" + opaAddr + "/v1"))).NoError(t)
+	client := gt.R1(opac.New(opac.Remote("http://" + opaAddr + "/v1"))).NoError(t)
 	ctx := context.Background()
 	input := map[string]interface{}{
 		"user": "admin",

@@ -12,15 +12,15 @@ import (
 	"github.com/open-policy-agent/opa/rego"
 )
 
-// SrcFiles is an option to specify the file path to read rego files. If path is a directory, it reads all files with the .rego extension in the directory.
+// Files is an option to specify the file path to read rego files. If path is a directory, it reads all files with the .rego extension in the directory.
 //
 // Example:
 //
-//	client, err := opac.New(opac.SrcFiles(
+//	client, err := opac.New(opac.Files(
 //		"path/to/policy_file.rego",
 //		"path/to/policy_dir",
 //	))
-func SrcFiles(paths ...string) Source {
+func Files(paths ...string) Source {
 	return func(cfg *config) (queryFunc, error) {
 		policies := map[string]string{}
 		for _, dirPath := range paths {
@@ -70,7 +70,7 @@ func SrcFiles(paths ...string) Source {
 	}
 }
 
-// SrcData is an option to specify the policy data as a map. The key can be set any value as file path and the value is the policy content.
+// Data is an option to specify the policy data as a map. The key can be set any value as file path and the value is the policy content.
 //
 // Example:
 //
@@ -83,8 +83,8 @@ func SrcFiles(paths ...string) Source {
 //	   "policy1.rego": data,
 //	 }
 //
-//	client, err := opac.New(opac.SrcData(policies))
-func SrcData(policies map[string]string) Source {
+//	client, err := opac.New(opac.Data(policies))
+func Data(policies map[string]string) Source {
 	return func(cfg *config) (queryFunc, error) {
 		if len(policies) == 0 {
 			return nil, ErrNoPolicyData

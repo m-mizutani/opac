@@ -30,7 +30,7 @@ type remoteConfig struct {
 	logger     *slog.Logger
 }
 
-func SrcRemote(baseURL string, options ...RemoteOption) Source {
+func Remote(baseURL string, options ...RemoteOption) Source {
 	return func(cfg *config) (queryFunc, error) {
 		tgtURL, err := url.Parse(baseURL)
 		if err != nil {

@@ -40,7 +40,7 @@ func TestLocal(t *testing.T) {
 	}
 
 	t.Run("success", doTest(testCase{
-		src:   opac.SrcFiles("testdata/local/f1.rego", "testdata/local/f2.rego"),
+		src:   opac.Files("testdata/local/f1.rego", "testdata/local/f2.rego"),
 		query: "data.color",
 		input: map[string]any{
 			"color": "blue",
@@ -51,13 +51,13 @@ func TestLocal(t *testing.T) {
 	}))
 
 	t.Run("no policy file", doTest(testCase{
-		src:    opac.SrcFiles("testdata/empty"),
+		src:    opac.Files("testdata/empty"),
 		query:  "data.color",
 		newErr: true,
 	}))
 
 	t.Run("no policy content", doTest(testCase{
-		src:   opac.SrcFiles("testdata/no_content/policy.rego"),
+		src:   opac.Files("testdata/no_content/policy.rego"),
 		query: "data.color",
 		input: map[string]any{
 			"color": "blue",
@@ -66,7 +66,7 @@ func TestLocal(t *testing.T) {
 	}))
 
 	t.Run("policy data", doTest(testCase{
-		src:   opac.SrcData(map[string]string{"policy.rego": "package color\nnumber := 5 { input.color == \"blue\" }"}),
+		src:   opac.Data(map[string]string{"policy.rego": "package color\nnumber := 5 { input.color == \"blue\" }"}),
 		query: "data.color",
 		input: map[string]any{
 			"color": "blue",

@@ -38,7 +38,7 @@ func TestLogger(t *testing.T) {
 		},
 	}
 	client := gt.R1(opac.New(
-		opac.SrcRemote("http://example.com/v1", opac.WithHTTPClient(mock)),
+		opac.Remote("http://example.com/v1", opac.WithHTTPClient(mock)),
 		opac.WithLogger(logger),
 	)).NoError(t)
 
