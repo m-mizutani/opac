@@ -24,6 +24,7 @@ func SrcFiles(paths ...string) Source {
 	return func(cfg *config) (queryFunc, error) {
 		policies := map[string]string{}
 		for _, dirPath := range paths {
+			cfg.logger.Debug("Importing policy files/dirs", "path", dirPath)
 			err := filepath.WalkDir(dirPath, func(path string, d fs.DirEntry, err error) error {
 				if err != nil {
 					return err
@@ -36,6 +37,7 @@ func SrcFiles(paths ...string) Source {
 				}
 
 				fpath := filepath.Clean(path)
+				cfg.logger.Debug("Reading policy file", "path", fpath)
 				raw, err := os.ReadFile(fpath)
 				if err != nil {
 					return fmt.Errorf("failed to read policy file: %w", err)
@@ -53,6 +55,7 @@ func SrcFiles(paths ...string) Source {
 		if len(policies) == 0 {
 			return nil, ErrNoPolicyData
 		}
+		cfg.logger.Debug("Policy files are loaded", "file count", len(policies))
 
 		compiler, err := ast.CompileModulesWithOpt(policies, ast.CompileOpts{
 			EnablePrintStatements: true,
@@ -61,8 +64,8 @@ func SrcFiles(paths ...string) Source {
 			return nil, fmt.Errorf("failed to compile policy: %w", err)
 		}
 
-		return func(ctx context.Context, query string, input, output any) error {
-			return queryLocal(ctx, compiler, query, input, output)
+		return func(ctx context.Context, query string, input, output any, opt *queryOptions) error {
+			return queryLocal(ctx, cfg, compiler, query, input, output, opt)
 		}, nil
 	}
 }
@@ -86,6 +89,7 @@ func SrcData(policies map[string]string) Source {
 		if len(policies) == 0 {
 			return nil, ErrNoPolicyData
 		}
+		cfg.logger.Debug("Policy data are loaded", "data count", len(policies))
 
 		compiler, err := ast.CompileModulesWithOpt(policies, ast.CompileOpts{
 			EnablePrintStatements: true,
@@ -94,19 +98,25 @@ func SrcData(policies map[string]string) Source {
 			return nil, fmt.Errorf("failed to compile policy: %w", err)
 		}
 
-		return func(ctx context.Context, query string, input, output any) error {
-			return queryLocal(ctx, compiler, query, input, output)
+		return func(ctx context.Context, query string, input, output any, opt *queryOptions) error {
+			return queryLocal(ctx, cfg, compiler, query, input, output, opt)
 		}, nil
 	}
 }
 
-func queryLocal(ctx context.Context, compiler *ast.Compiler, query string, input, output any) error {
-	q := rego.New(
+func queryLocal(ctx context.Context, cfg *config, compiler *ast.Compiler, query string, input, output any, opt *queryOptions) error {
+	options := []func(r *rego.Rego){
 		rego.Query(query),
-		// rego.PrintHook()
 		rego.Compiler(compiler),
 		rego.Input(input),
-	)
+	}
+
+	if opt != nil && opt.printHook != nil {
+		cfg.logger.Debug("Setting print hook")
+		options = append(options, rego.PrintHook(opt.printHook))
+	}
+
+	q := rego.New(options...)
 
 	rs, err := q.Eval(ctx)
 	if err != nil {

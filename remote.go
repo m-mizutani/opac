@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"path"
@@ -26,6 +27,7 @@ func WithHTTPClient(client HTTPClient) RemoteOption {
 
 type remoteConfig struct {
 	httpClient HTTPClient
+	logger     *slog.Logger
 }
 
 func SrcRemote(baseURL string, options ...RemoteOption) Source {
@@ -37,19 +39,20 @@ func SrcRemote(baseURL string, options ...RemoteOption) Source {
 
 		remoteCfg := &remoteConfig{
 			httpClient: http.DefaultClient,
+			logger:     cfg.logger,
 		}
 
 		for _, opt := range options {
 			opt(remoteCfg)
 		}
 
-		return func(ctx context.Context, query string, input, output any) error {
-			return remoteQuery(ctx, query, input, output, remoteCfg, tgtURL)
+		return func(ctx context.Context, query string, input, output any, opt *queryOptions) error {
+			return remoteQuery(ctx, query, input, output, remoteCfg, tgtURL, opt)
 		}, nil
 	}
 }
 
-func remoteQuery(ctx context.Context, query string, input, output any, cfg *remoteConfig, tgtURL *url.URL) error {
+func remoteQuery(ctx context.Context, query string, input, output any, cfg *remoteConfig, tgtURL *url.URL, _ *queryOptions) error {
 	type httpInput struct {
 		Input any `json:"input"`
 	}
@@ -76,19 +79,20 @@ func remoteQuery(ctx context.Context, query string, input, output any, cfg *remo
 
 	req.Header.Set("Content-Type", "application/json")
 
+	cfg.logger.Debug("Sending request to OPA server", "url", req.URL.String(), "body", string(inputBody))
 	resp, err := cfg.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to send request to OPA server: %w", err)
 	}
 	defer resp.Body.Close()
 
+	body, readErr := io.ReadAll(resp.Body)
+	cfg.logger.Debug("Received response from OPA server", "status", resp.StatusCode, "body", string(body), "headers", resp.Header)
+
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("unexpected status code from OPA server: %d msg='%s'", resp.StatusCode, string(body))
 	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
+	if readErr != nil {
 		return fmt.Errorf("failed to read response body: %w", err)
 	}
 
