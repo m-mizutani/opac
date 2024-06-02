@@ -1,16 +1,19 @@
 package opac_test
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
+	"os"
+	"os/exec"
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/m-mizutani/gt"
 	"github.com/m-mizutani/opac"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 type httpMock struct {
@@ -22,39 +25,179 @@ func (x *httpMock) Do(req *http.Request) (*http.Response, error) {
 }
 
 func TestRemote(t *testing.T) {
-	in := struct{ Number string }{Number: "five"}
-	var out1, out2 struct{ Color string }
-
-	var resp struct {
-		Result interface{} `json:"result"`
+	type testCase struct {
+		url    string
+		query  string
+		input  map[string]any
+		do     func(req *http.Request) (*http.Response, error)
+		expect bool
+		isErr  bool
 	}
 
-	ctx := context.Background()
-	var called int
+	doTest := func(tc testCase) func(t *testing.T) {
+		return func(t *testing.T) {
+			mock := &httpMock{
+				do: tc.do,
+			}
+			client := gt.R1(opac.New(
+				opac.SrcRemote(tc.url, opac.WithHTTPClient(mock)),
+			)).NoError(t)
+			ctx := context.Background()
+			input := map[string]interface{}{
+				"user": "admin",
+			}
+			var output struct {
+				Allow bool `json:"allow"`
+			}
 
-	remote, err := opac.NewRemote("http://example.com",
-		opac.WithHTTPClient(&httpMock{
-			do: func(req *http.Request) (*http.Response, error) {
-				called++
-				out2.Color = "blue"
-				resp.Result = out2
+			err := client.Query(ctx, "data.system.authz", input, &output)
+			if tc.isErr {
+				gt.Error(t, err)
+			} else {
+				gt.Equal(t, output.Allow, tc.expect)
+			}
+		}
+	}
 
-				var input map[string]map[string]interface{}
-				require.NoError(t, json.NewDecoder(req.Body).Decode(&input))
-				assert.Equal(t, "five", input["input"]["Number"])
-
-				raw, err := json.Marshal(resp)
-				require.NoError(t, err)
-				return &http.Response{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(bytes.NewReader(raw)),
-				}, nil
-			},
+	t.Run("success", doTest(testCase{
+		url:   "https://example.com/v1",
+		query: "data.system.authz",
+		input: map[string]any{
+			"user": "admin",
 		},
-		))
-	require.NoError(t, err)
+		do: func(req *http.Request) (*http.Response, error) {
+			var body struct {
+				Input map[string]any `json:"input"`
+			}
+			gt.NoError(t, json.NewDecoder(req.Body).Decode(&body))
+			gt.Equal(t, body.Input, map[string]any{"user": "admin"})
 
-	require.NoError(t, remote.Query(ctx, in, &out1))
-	assert.Equal(t, 1, called)
-	assert.Equal(t, "blue", out1.Color)
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(strings.NewReader(`{"result": {"allow": true}}`)),
+			}, nil
+		},
+		expect: true,
+	}))
+
+	t.Run("client error", doTest(testCase{
+		url:   "https://example.com/v1",
+		query: "data.system.authz",
+		input: map[string]any{
+			"user": "admin",
+		},
+		do: func(req *http.Request) (*http.Response, error) {
+			return nil, errors.New("some error")
+		},
+		isErr: true,
+	}))
+
+	t.Run("server error", doTest(testCase{
+		url:   "https://example.com/v1",
+		query: "data.system.authz",
+		input: map[string]any{
+			"user": "admin",
+		},
+		do: func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: 500,
+				Body:       io.NopCloser(strings.NewReader(`{"error": "some error"}`)),
+			}, nil
+		},
+		isErr: true,
+	}))
+
+	t.Run("invalid response", doTest(testCase{
+		url:   "https://example.com/v1",
+		query: "data.system.authz",
+		input: map[string]any{
+			"user": "admin",
+		},
+		do: func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(strings.NewReader(`invalid json`)),
+			}, nil
+		},
+		isErr: true,
+	}))
+
+	t.Run("invalid response body", doTest(testCase{
+		url:   "https://example.com/v1",
+		query: "data.system.authz",
+		input: map[string]any{
+			"user": "admin",
+		},
+		do: func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(strings.NewReader(`{"result": {"allow": 1}}`)),
+			}, nil
+		},
+		isErr: true,
+	}))
+
+	t.Run("no result, but valid response", doTest(testCase{
+		url:   "https://example.com/v1",
+		query: "data.system.authz",
+		input: map[string]any{
+			"user": "admin",
+		},
+		do: func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(strings.NewReader(`{"result": {}}`)),
+			}, nil
+		},
+		isErr:  false,
+		expect: false,
+	}))
+
+	t.Run("nil result and get error", doTest(testCase{
+		url:   "https://example.com/v1",
+		query: "data.system.authz",
+		input: map[string]any{
+			"user": "admin",
+		},
+		do: func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(strings.NewReader(`{}`)),
+			}, nil
+		},
+		isErr: true,
+	}))
+}
+
+func loadEnvVar(t *testing.T, key string) string {
+	v, ok := os.LookupEnv(key)
+	if !ok {
+		t.Skipf("missing environment variable: %s", key)
+	}
+
+	return v
+}
+
+func TestRemoteWithOPACommand(t *testing.T) {
+	opaAddr := "localhost:18181"
+	// Start OPA server
+	opaPath := loadEnvVar(t, "TEST_OPA_PATH")
+	cmd := exec.Command(opaPath, "run", "--server", "-a", opaAddr, "testdata/server")
+	cmd.Start()
+	gt.NotEqual(t, cmd.Process, nil)
+	defer cmd.Process.Kill()
+
+	time.Sleep(1 * time.Second)
+
+	client := gt.R1(opac.New(opac.SrcRemote("http://" + opaAddr + "/v1"))).NoError(t)
+	ctx := context.Background()
+	input := map[string]interface{}{
+		"user": "admin",
+	}
+	var output struct {
+		Allow bool `json:"allow"`
+	}
+
+	gt.NoError(t, client.Query(ctx, "data.system.authz", input, &output))
+	gt.True(t, output.Allow)
 }

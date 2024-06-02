@@ -1,149 +1,26 @@
-# opac: OPA/Rego inquiry library [![Test](https://github.com/m-mizutani/opac/actions/workflows/test.yml/badge.svg)](https://github.com/m-mizutani/opac/actions/workflows/test.yml) [![Vuln scan](https://github.com/m-mizutani/opac/actions/workflows/trivy.yml/badge.svg)](https://github.com/m-mizutani/opac/actions/workflows/trivy.yml) [![Sec Scan](https://github.com/m-mizutani/opac/actions/workflows/gosec.yml/badge.svg)](https://github.com/m-mizutani/opac/actions/workflows/gosec.yml) [![Go Reference](https://pkg.go.dev/badge/github.com/m-mizutani/opac.svg)](https://pkg.go.dev/github.com/m-mizutani/opac)
+# opac: Rego policy inquiry library with OPA
 
 Unofficial Rego evaluation API for OPA server, local Rego file and in-memory Rego data.
 
 ## Motivation
 
-[Rego](https://www.openpolicyagent.org/docs/latest/policy-language) is general policy language and various evaluation methods for Rego are provided by official. In programing way, there are three major to evaluate policy.
+[Rego](https://www.openpolicyagent.org/docs/latest/policy-language) is a versatile policy language, and the official documentation provides various methods for evaluating Rego policies. There are three primary ways to evaluate policies programmatically:
 
-- Inquiry to OPA server
-- Use local policy file(s)
-- Use in-memory policy data (e.g. from environment variable)
+- Querying the OPA server
+- Using local policy files
+- Utilizing in-memory policy data (e.g., data from environment variables)
 
-A software developer can choose a appropriate way according to own requirements. However, in many case, an end user also want to choose evaluation method by each runtime environment. Therefore, unified policy evaluation method may be useful for developer to integrate with Rego.
+A software developer can choose the most suitable method based on their specific requirements. However, in many cases, end users also want to select the evaluation method depending on the runtime environment. Therefore, a unified policy evaluation approach can be beneficial for developers integrating Rego into their applications.
 
-`opac` provides abstracted API to evaluate Rego with OPA server, local policy file and in-memory text data. A developer can easily implement switching evaluation method mechanism by option chosen by end user.
+The `opac` library offers an abstracted API to evaluate Rego policies using an OPA server, local policy files, or in-memory text data. This allows developers to easily implement a mechanism to switch between evaluation methods based on the options chosen by end users.
 
 ## Example
 
 ### Query to OPA server
 
-[source code](./examples/remote/)
-
-```go
-func main() {
-	client, err := opac.NewRemote("https://opa-server-h6tk4k5hyq-an.a.run.app/v1/data/example")
-	if err != nil {
-		panic(err.Error())
-	}
-
-	input := struct {
-		Color string `json:"color"`
-	}{
-		Color: "blue",
-	}
-	output := struct {
-		Allow bool `json:"allow"`
-	}{}
-
-	if err := client.Query(context.Background(), input, &output); err != nil {
-		panic(err.Error())
-	}
-
-	fmt.Println("result:", output)
-}
-```
-
 ### Query with local policy file(s)
 
-[source code](./examples/local/)
 
-```go
-func main() {
-	client, err := opac.NewLocal(
-		opac.WithFile("./examples/local/policy.rego"),
-		opac.WithPackage("example"),
-	)
-	if err != nil {
-		panic(err.Error())
-	}
-
-	input := struct {
-		Color string `json:"color"`
-	}{
-		Color: "blue",
-	}
-	output := struct {
-		Allow bool `json:"allow"`
-	}{}
-
-	if err := client.Query(context.Background(), input, &output); err != nil {
-		panic(err.Error())
-	}
-
-	fmt.Println("result:", output)
-}
-```
-
-### Test with mock
-
-Your package code
-```go
-package mock
-
-import (
-	"context"
-
-	"github.com/m-mizutani/opac"
-)
-
-type Foo struct {
-	client opac.Client
-}
-
-type Input struct{ User string }
-type Result struct{ Allow bool }
-
-func New(url string) *Foo {
-	client, err := opac.NewRemote(url)
-	if err != nil {
-		panic(err)
-	}
-
-	return &Foo{
-		client: client,
-	}
-}
-
-func (x *Foo) IsAllow(user string) bool {
-	input := &Input{User: user}
-	var result Result
-	if err := x.client.Query(context.Background(), input, &result); err != nil {
-		panic(err)
-	}
-
-	return result.Allow
-}
-```
-
-Then, create [export_test.go](./examples/mock/export_test.go) as following.
-
-```go
-package mock
-
-import "github.com/m-mizutani/opac"
-
-func NewWithMock(f opac.MockFunc) *Foo {
-	return &Foo{
-		client: opac.NewMock(f),
-	}
-}
-```
-
-After that, you can write [Foo's test](./examples/mock/main_test.go) as following.
-
-```go
-func TestWithMock(t *testing.T) {
-	foo := mock.NewWithMock(func(input interface{}) (interface{}, error) {
-		in, ok := input.(*mock.Input)
-		require.True(t, ok)
-		return &mock.Result{Allow: in.User == "blue"}, nil
-	})
-
-	assert.True(t, foo.IsAllow("blue"))
-	assert.False(t, foo.IsAllow("orange"))
-}
-```
 
 ## Options
 
