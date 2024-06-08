@@ -16,30 +16,71 @@ The `opac` library offers an abstracted API to evaluate Rego policies using an O
 
 ## Example
 
-### Query to OPA server
-
 ### Query with local policy file(s)
 
+```go
+	client, err := opac.New(opac.Files("testdata/examples/authz.rego"))
+	if err != nil {
+		panic(err)
+	}
 
+	input := map[string]string{
+		"user": "bob",
+		"role": "admin",
+	}
+	var output struct {
+		Allow bool `json:"allow"`
+	}
+	ctx := context.Background()
+	if err := client.Query(ctx, "data.authz", input, &output); err != nil {
+		panic(err)
+	}
+	fmt.Println("allow =>", output.Allow)
+	//Output: allow => true
+```
 
-## Options
+### Query to OPA server
 
-### for `NewRemote`
+```go
+	// For example: export OPA_SERVER_URL=http://localhost:8181/v1
+	opaServerURL, ok := os.LookupEnv("OPA_SERVER_URL")
+	if !ok {
+		fmt.Println("allow => true") // dummy output
+		return
+	}
 
-- `WithHTTPClient`: Replace `http.DefaultClient` with own `HTTPClient` instance.
-- `WithHTTPHeader`: Add HTTP header. It can be added multiply.
-- `WithLoggingRemote`: Enable debug logging
+	client, err := opac.New(opac.Remote(opaServerURL))
+	if err != nil {
+		panic(err)
+	}
 
-### for `NewLocal`
+	input := map[string]string{
+		"user": "alice",
+	}
+	var output struct {
+		Allow bool `json:"allow"`
+	}
+	ctx := context.Background()
+	if err := client.Query(ctx, "data.authz", input, &output); err != nil {
+		panic(err)
+	}
+	fmt.Println("allow =>", output.Allow)
+	//Output: allow => true
+```
 
-One ore more `WithFile`, `WithDir` or `WithPolicyData` is required.
+## Arguments
 
-- `WithFile`: Specify a policy file
-- `WithDir`: Specify a policy file directory (search recursively)
-- `WithPolicyData`: Specify a policy data
-- `WithPackage`: Specify package name like "example.my_policy"
-- `WithLoggingLocal`: Enable debug logging
-- `WithRegoPrint`: Output `print()` result to `io.Writer`
+### Sources
+
+`Source` specifies the source of the Rego policy data.
+
+- `Files`: Read policies from local files. It can specify multiple files. If a directory is specified, it will be searched recursively.
+- `Data`: Read policies from in-memory data.
+- `Remote`: Use policies by inquiring the OPA server.
+
+### Options
+
+- `WithPrintHook`: Print the evaluation result to the standard output. It can be used for `Files` and `Data` sources.
 
 ## License
 
