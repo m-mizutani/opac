@@ -46,13 +46,13 @@ func Remote(baseURL string, options ...RemoteOption) Source {
 			opt(remoteCfg)
 		}
 
-		return func(ctx context.Context, query string, input, output any, opt *queryOptions) error {
+		return func(ctx context.Context, query string, input, output any, opt queryOptions) error {
 			return remoteQuery(ctx, query, input, output, remoteCfg, tgtURL, opt)
 		}, nil
 	}
 }
 
-func remoteQuery(ctx context.Context, query string, input, output any, cfg *remoteConfig, tgtURL *url.URL, _ *queryOptions) error {
+func remoteQuery(ctx context.Context, query string, input, output any, cfg *remoteConfig, tgtURL *url.URL, _ queryOptions) error {
 	type httpInput struct {
 		Input any `json:"input"`
 	}

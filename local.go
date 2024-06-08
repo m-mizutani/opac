@@ -64,7 +64,7 @@ func Files(paths ...string) Source {
 			return nil, fmt.Errorf("failed to compile policy: %w", err)
 		}
 
-		return func(ctx context.Context, query string, input, output any, opt *queryOptions) error {
+		return func(ctx context.Context, query string, input, output any, opt queryOptions) error {
 			return queryLocal(ctx, cfg, compiler, query, input, output, opt)
 		}, nil
 	}
@@ -98,20 +98,20 @@ func Data(policies map[string]string) Source {
 			return nil, fmt.Errorf("failed to compile policy: %w", err)
 		}
 
-		return func(ctx context.Context, query string, input, output any, opt *queryOptions) error {
+		return func(ctx context.Context, query string, input, output any, opt queryOptions) error {
 			return queryLocal(ctx, cfg, compiler, query, input, output, opt)
 		}, nil
 	}
 }
 
-func queryLocal(ctx context.Context, cfg *config, compiler *ast.Compiler, query string, input, output any, opt *queryOptions) error {
+func queryLocal(ctx context.Context, cfg *config, compiler *ast.Compiler, query string, input, output any, opt queryOptions) error {
 	options := []func(r *rego.Rego){
 		rego.Query(query),
 		rego.Compiler(compiler),
 		rego.Input(input),
 	}
 
-	if opt != nil && opt.printHook != nil {
+	if opt.printHook != nil {
 		cfg.logger.Debug("Setting print hook")
 		options = append(options, rego.PrintHook(opt.printHook))
 	}

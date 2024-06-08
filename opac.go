@@ -13,7 +13,7 @@ type Client struct {
 	query queryFunc
 }
 
-type queryFunc func(ctx context.Context, query string, input, output any, opt *queryOptions) error
+type queryFunc func(ctx context.Context, query string, input, output any, opt queryOptions) error
 
 type config struct {
 	logger *slog.Logger
@@ -60,9 +60,9 @@ func New(src Source, options ...Option) (*Client, error) {
 
 // Query evaluates the given query with the provided input and output. The query is evaluated against the policy data provided during client creation.
 func (c *Client) Query(ctx context.Context, query string, input, output any, options ...QueryOption) error {
-	opt := &queryOptions{}
+	opt := queryOptions{}
 	for _, o := range options {
-		o(opt)
+		o(&opt)
 	}
 
 	return c.query(ctx, query, input, output, opt)
