@@ -4,194 +4,136 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 
-	"github.com/m-mizutani/goerr"
-	"github.com/m-mizutani/zlog"
 	"github.com/open-policy-agent/opa/ast"
 	"github.com/open-policy-agent/opa/rego"
-	"github.com/open-policy-agent/opa/topdown/print"
 )
 
-// Local loads and compile local policy data and evaluate input data with them.
-type Local struct {
-	flies    []string
-	dirs     []string
-	policies map[string]string
+// Files is an option to specify the file path to read rego files. If path is a directory, it reads all files with the .rego extension in the directory.
+//
+// Example:
+//
+//	client, err := opac.New(opac.Files(
+//		"path/to/policy_file.rego",
+//		"path/to/policy_dir",
+//	))
+func Files(paths ...string) Source {
+	return func(cfg *config) (queryFunc, error) {
+		policies := map[string]string{}
+		for _, dirPath := range paths {
+			cfg.logger.Debug("Importing policy files/dirs", "path", dirPath)
+			err := filepath.WalkDir(dirPath, func(path string, d fs.DirEntry, err error) error {
+				if err != nil {
+					return err
+				}
+				if d.IsDir() {
+					return nil
+				}
+				if filepath.Ext(path) != ".rego" {
+					return nil
+				}
 
-	compiler *ast.Compiler
-	query    string
-	logger   *zlog.Logger
-	print    io.Writer
-}
+				fpath := filepath.Clean(path)
+				cfg.logger.Debug("Reading policy file", "path", fpath)
+				raw, err := os.ReadFile(fpath)
+				if err != nil {
+					return fmt.Errorf("failed to read policy file: %w", err)
+				}
 
-// LocalOption is Option of functional option pattern for Local
-type LocalOption func(x *Local)
+				policies[fpath] = string(raw)
 
-// WithFile specifies .rego policy file path
-func WithFile(filePath string) LocalOption {
-	return func(x *Local) {
-		x.flies = append(x.flies, filepath.Clean(filePath))
-	}
-}
-
-// WithDir specifies directory path of .rego policy. Import policy files recursively.
-func WithDir(dirPath string) LocalOption {
-	return func(x *Local) {
-		x.dirs = append(x.dirs, filepath.Clean(dirPath))
-	}
-}
-
-// WithPolicyData specifies raw policy data with name. If the `name` conflicts with file path loaded by WithFile or WithDir, the policy overwrites data loaded by WithFile or WithDir.
-func WithPolicyData(name, policy string) LocalOption {
-	return func(x *Local) {
-		x.policies[name] = policy
-	}
-}
-
-// WithPackage specifies using package name. e.g. "example.my_policy"
-func WithPackage(pkg string) LocalOption {
-	return func(x *Local) {
-		x.query = "data." + pkg
-	}
-}
-
-// WithLoggingLocal enables logger for debug
-func WithLoggingLocal() LocalOption {
-	return func(x *Local) {
-		x.logger = zlog.New(zlog.WithLogLevel("debug"))
-	}
-}
-
-// WithRegoPrint enables OPA print function and output to `w`
-func WithRegoPrint(w io.Writer) LocalOption {
-	return func(x *Local) {
-		x.print = w
-	}
-}
-
-// NewLocal creates a new Local client. It requires one or more WithFile, WithDir or WithPolicyData.
-func NewLocal(options ...LocalOption) (*Local, error) {
-	client := &Local{
-		query:    "data",
-		logger:   zlog.New(),
-		policies: make(map[string]string),
-	}
-	for _, opt := range options {
-		opt(client)
-	}
-
-	policies := make(map[string]string)
-	var targetFiles []string
-	for _, dirPath := range client.dirs {
-		err := filepath.WalkDir(dirPath, func(path string, d fs.DirEntry, err error) error {
+				return nil
+			})
 			if err != nil {
-				return ErrReadRegoDir.Wrap(err).With("path", path)
+				return nil, fmt.Errorf("failed to walk directory: %w", err)
 			}
-			if d.IsDir() {
-				return nil
-			}
-			if filepath.Ext(path) != ".rego" {
-				return nil
-			}
+		}
 
-			targetFiles = append(targetFiles, path)
+		if len(policies) == 0 {
+			return nil, ErrNoPolicyData
+		}
+		cfg.logger.Debug("Policy files are loaded", "file count", len(policies))
 
-			return nil
+		compiler, err := ast.CompileModulesWithOpt(policies, ast.CompileOpts{
+			EnablePrintStatements: true,
 		})
 		if err != nil {
-			return nil, goerr.Wrap(err)
+			return nil, fmt.Errorf("failed to compile policy: %w", err)
 		}
-	}
-	targetFiles = append(targetFiles, client.flies...)
 
-	for _, filePath := range targetFiles {
-		raw, err := os.ReadFile(filepath.Clean(filePath))
+		return func(ctx context.Context, query string, input, output any, opt queryOptions) error {
+			return queryLocal(ctx, cfg, compiler, query, input, output, opt)
+		}, nil
+	}
+}
+
+// Data is an option to specify the policy data as a map. The key can be set any value as file path and the value is the policy content.
+//
+// Example:
+//
+//	data := `package system.authz
+//	  allow {
+//	    input.user == "admin"
+//	  }
+//	`
+//	 policies := map[string]string{
+//	   "policy1.rego": data,
+//	 }
+//
+//	client, err := opac.New(opac.Data(policies))
+func Data(policies map[string]string) Source {
+	return func(cfg *config) (queryFunc, error) {
+		if len(policies) == 0 {
+			return nil, ErrNoPolicyData
+		}
+		cfg.logger.Debug("Policy data are loaded", "data count", len(policies))
+
+		compiler, err := ast.CompileModulesWithOpt(policies, ast.CompileOpts{
+			EnablePrintStatements: true,
+		})
 		if err != nil {
-			return nil, ErrReadRegoFile.Wrap(err).With("path", filePath)
+			return nil, fmt.Errorf("failed to compile policy: %w", err)
 		}
 
-		policies[filePath] = string(raw)
+		return func(ctx context.Context, query string, input, output any, opt queryOptions) error {
+			return queryLocal(ctx, cfg, compiler, query, input, output, opt)
+		}, nil
 	}
-
-	for k, v := range client.policies {
-		policies[k] = v
-	}
-
-	if len(policies) == 0 {
-		return nil, goerr.Wrap(ErrNoPolicyData)
-	}
-
-	compiler, err := ast.CompileModulesWithOpt(policies, ast.CompileOpts{
-		EnablePrintStatements: true,
-	})
-	if err != nil {
-		return nil, goerr.Wrap(err)
-	}
-	client.compiler = compiler
-
-	client.logger.
-		With("query", client.query).
-		With("loaded files", targetFiles).
-		Debug("created local client")
-
-	return client, nil
 }
 
-type printLogger struct {
-	w io.Writer
-}
-
-func (x *printLogger) Print(ctx print.Context, msg string) error {
-	if x.w != nil {
-		fmt.Fprintf(x.w, "%s:%d %s", ctx.Location.File, ctx.Location.Row, msg)
-	}
-	return nil
-}
-
-// Query evaluates policy with `input` data. The result will be written to `out`. `out` must be pointer of instance.
-func (x *Local) Query(ctx context.Context, input interface{}, output interface{}, options ...QueryOption) error {
-	x.logger.With("in", input).Debug("start Local.Query")
-
-	cfg := newQueryConfig(options...)
-
-	logger := x.print
-	if cfg.printWriter != nil {
-		logger = cfg.printWriter
-	}
-
-	q := rego.New(
-		rego.Query(x.query+cfg.pkgSuffix),
-		rego.PrintHook(&printLogger{
-			w: logger,
-		}),
-		rego.Compiler(x.compiler),
+func queryLocal(ctx context.Context, cfg *config, compiler *ast.Compiler, query string, input, output any, opt queryOptions) error {
+	options := []func(r *rego.Rego){
+		rego.Query(query),
+		rego.Compiler(compiler),
 		rego.Input(input),
-	)
+	}
+
+	if opt.printHook != nil {
+		cfg.logger.Debug("Setting print hook")
+		options = append(options, rego.PrintHook(opt.printHook))
+	}
+
+	q := rego.New(options...)
 
 	rs, err := q.Eval(ctx)
-
 	if err != nil {
-		return goerr.Wrap(err, "fail to eval local policy").With("input", input)
-	}
-	if len(rs) == 0 || len(rs[0].Expressions) == 0 {
-		return goerr.Wrap(ErrNoEvalResult)
+		return fmt.Errorf("failed to evaluate query: %w", err)
 	}
 
-	x.logger.With("rs", rs).Debug("got a result of rego.Eval")
+	if len(rs) == 0 || len(rs[0].Expressions) == 0 {
+		return ErrNoEvalResult
+	}
 
 	raw, err := json.Marshal(rs[0].Expressions[0].Value)
 	if err != nil {
-		return goerr.Wrap(err, "fail to marshal a result of rego.Eval").With("rs", rs)
+		return fmt.Errorf("failed to marshal result: %w", err)
 	}
 	if err := json.Unmarshal(raw, output); err != nil {
-		return goerr.Wrap(err, "fail to unmarshal a result of rego.Eval to out").With("rs", rs)
+		return fmt.Errorf("failed to unmarshal result: %w", err)
 	}
-
-	x.logger.With("result set", rs).Debug("done Local.Query")
 
 	return nil
 }

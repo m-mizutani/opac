@@ -1,5 +1,5 @@
 package color
 
-allow {
+number := 5 {
     input.color == "blue"
 }

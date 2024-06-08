@@ -1,6 +1,10 @@
-name: Unit test
+name: test
 
-on: [push]
+on:
+  push:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
 
 jobs:
   testing:
@@ -8,11 +12,10 @@ jobs:
 
     steps:
       - name: Checkout upstream repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
         with:
           ref: ${{ github.head_ref }}
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@6edd4406fa81c3da01a34fa6f6343087c207a568 # v3.5.0
         with:
-          go-version: "1.18"
-      - run: go test .
-      - run: go vet .
+          go-version-file: "go.mod"
+      - run: go test ./...

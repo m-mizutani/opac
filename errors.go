@@ -1,11 +1,11 @@
 package opac
 
-import "github.com/m-mizutani/goerr"
+import "errors"
 
 var (
-	ErrNoEvalResult       = goerr.New("no evaluation result")
-	ErrReadRegoDir        = goerr.New("fail to read rego directory")
-	ErrReadRegoFile       = goerr.New("fail to read rego file")
-	ErrNoPolicyData       = goerr.New("no policy data, one ore more file or policy data are required")
-	ErrInvalidQueryOption = goerr.New("invalid query option")
+	// ErrNoPolicyData is returned when no policy data is provided.
+	ErrNoPolicyData = errors.New("no policy data, one ore more file or policy data are required")
+
+	// ErrNoPolicySrc is returned when no result of evaluation is provided. If you expect a result, you should check the error. If you don't expect a result, you should ignore the error.
+	ErrNoEvalResult = errors.New("no evaluation result")
 )
