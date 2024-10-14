@@ -5,22 +5,25 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/open-policy-agent/opa/ast"
 	"github.com/open-policy-agent/opa/topdown/print"
 )
 
 // Client is the main interface to interact with the opac library.
 type Client struct {
-	query queryFunc
+	src Source
 }
-
-type queryFunc func(ctx context.Context, query string, input, output any, opt queryOptions) error
 
 type config struct {
 	logger *slog.Logger
 }
 
 // Source is a function that returns the policy data. It is used to provide the policy data to the client.
-type Source func(cfg *config) (queryFunc, error)
+type Source interface {
+	Configure(cfg *config) error
+	Query(ctx context.Context, query string, input, output any, opt queryOptions) error
+	AnnotationSet() *ast.AnnotationSet
+}
 
 // Option is a function that configures the client.
 type Option func(*config)
@@ -48,13 +51,12 @@ func New(src Source, options ...Option) (*Client, error) {
 		opt(cfg)
 	}
 
-	query, err := src(cfg)
-	if err != nil {
+	if err := src.Configure(cfg); err != nil {
 		return nil, fmt.Errorf("failed to create client: %w", err)
 	}
 
 	return &Client{
-		query: query,
+		src: src,
 	}, nil
 }
 
@@ -65,7 +67,7 @@ func (c *Client) Query(ctx context.Context, query string, input, output any, opt
 		o(&opt)
 	}
 
-	return c.query(ctx, query, input, output, opt)
+	return c.src.Query(ctx, query, input, output, opt)
 }
 
 type queryOptions struct {
@@ -79,4 +81,9 @@ func WithPrintHook(h print.Hook) QueryOption {
 	return func(o *queryOptions) {
 		o.printHook = h
 	}
+}
+
+// AnnotationSet returns the annotation set of the policy data. It works only for local policy data (File or Data).
+func (c *Client) AnnotationSet() {
+	c.src.AnnotationSet()
 }

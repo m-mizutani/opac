@@ -11,48 +11,54 @@ import (
 	"net/url"
 	"path"
 	"strings"
+
+	"github.com/open-policy-agent/opa/ast"
 )
 
 type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-type RemoteOption func(*remoteConfig)
+type RemoteOption func(*remoteSource)
 
 func WithHTTPClient(client HTTPClient) RemoteOption {
-	return func(cfg *remoteConfig) {
-		cfg.httpClient = client
+	return func(r *remoteSource) {
+		r.httpClient = client
 	}
 }
 
-type remoteConfig struct {
+type remoteSource struct {
 	httpClient HTTPClient
 	logger     *slog.Logger
+	rawURL     string
+	url        *url.URL
+	options    []RemoteOption
 }
 
-func Remote(baseURL string, options ...RemoteOption) Source {
-	return func(cfg *config) (queryFunc, error) {
-		tgtURL, err := url.Parse(baseURL)
-		if err != nil {
-			return nil, fmt.Errorf("invalid remote base URL: %w", err)
-		}
+// AnnotationSet implements Source.
+func (r *remoteSource) AnnotationSet() *ast.AnnotationSet {
+	return &ast.AnnotationSet{}
+}
 
-		remoteCfg := &remoteConfig{
-			httpClient: http.DefaultClient,
-			logger:     cfg.logger,
-		}
-
-		for _, opt := range options {
-			opt(remoteCfg)
-		}
-
-		return func(ctx context.Context, query string, input, output any, opt queryOptions) error {
-			return remoteQuery(ctx, query, input, output, remoteCfg, tgtURL, opt)
-		}, nil
+// Configure implements Source.
+func (r *remoteSource) Configure(cfg *config) error {
+	tgtURL, err := url.Parse(r.rawURL)
+	if err != nil {
+		return fmt.Errorf("invalid remote base URL: %w", err)
 	}
+
+	for _, opt := range r.options {
+		opt(r)
+	}
+
+	r.logger = cfg.logger
+	r.url = tgtURL
+
+	return nil
 }
 
-func remoteQuery(ctx context.Context, query string, input, output any, cfg *remoteConfig, tgtURL *url.URL, _ queryOptions) error {
+// Query implements Source.
+func (r *remoteSource) Query(ctx context.Context, query string, input any, output any, opt queryOptions) error {
 	type httpInput struct {
 		Input any `json:"input"`
 	}
@@ -68,7 +74,7 @@ func remoteQuery(ctx context.Context, query string, input, output any, cfg *remo
 		return fmt.Errorf("failed to marshal input: %w", err)
 	}
 
-	reqURL := tgtURL
+	reqURL := r.url
 	queryPath := strings.ReplaceAll(query, ".", "/")
 	reqURL.Path = path.Join(reqURL.Path, queryPath)
 
@@ -79,15 +85,15 @@ func remoteQuery(ctx context.Context, query string, input, output any, cfg *remo
 
 	req.Header.Set("Content-Type", "application/json")
 
-	cfg.logger.Debug("Sending request to OPA server", "url", req.URL.String(), "body", string(inputBody))
-	resp, err := cfg.httpClient.Do(req)
+	r.logger.Debug("Sending request to OPA server", "url", req.URL.String(), "body", string(inputBody))
+	resp, err := r.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to send request to OPA server: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, readErr := io.ReadAll(resp.Body)
-	cfg.logger.Debug("Received response from OPA server", "status", resp.StatusCode, "body", string(body), "headers", resp.Header)
+	r.logger.Debug("Received response from OPA server", "status", resp.StatusCode, "body", string(body), "headers", resp.Header)
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("unexpected status code from OPA server: %d msg='%s'", resp.StatusCode, string(body))
@@ -114,4 +120,14 @@ func remoteQuery(ctx context.Context, query string, input, output any, cfg *remo
 	}
 
 	return nil
+}
+
+var _ Source = (*remoteSource)(nil)
+
+func Remote(baseURL string, options ...RemoteOption) *remoteSource {
+	return &remoteSource{
+		httpClient: http.DefaultClient,
+		rawURL:     baseURL,
+		options:    options,
+	}
 }
