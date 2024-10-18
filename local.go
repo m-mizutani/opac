@@ -62,6 +62,9 @@ func (f *fileSource) Configure(cfg *config) error {
 
 	compiler, err := ast.CompileModulesWithOpt(policies, ast.CompileOpts{
 		EnablePrintStatements: true,
+		ParserOptions: ast.ParserOptions{
+			ProcessAnnotation: true,
+		},
 	})
 	if err != nil {
 		return fmt.Errorf("failed to compile policy: %w", err)
@@ -121,7 +124,16 @@ type dataSource struct {
 
 // AnnotationSet implements Source.
 func (d *dataSource) AnnotationSet() *ast.AnnotationSet {
-	return d.compiler.GetAnnotationSet()
+	var modules []*ast.Module
+	for _, m := range d.compiler.Modules {
+		modules = append(modules, m)
+	}
+	as, err := ast.BuildAnnotationSet(modules)
+	if err != nil {
+		panic(fmt.Errorf("failed to build annotation set: %w", err))
+	}
+	return as
+
 }
 
 // Configure implements Source.
@@ -133,6 +145,9 @@ func (d *dataSource) Configure(cfg *config) error {
 
 	compiler, err := ast.CompileModulesWithOpt(d.policies, ast.CompileOpts{
 		EnablePrintStatements: true,
+		ParserOptions: ast.ParserOptions{
+			ProcessAnnotation: true,
+		},
 	})
 	if err != nil {
 		return fmt.Errorf("failed to compile policy: %w", err)
