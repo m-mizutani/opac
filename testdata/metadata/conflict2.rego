@@ -1,5 +1,5 @@
 # METADATA
-# title: my package
+# title: conflict2
 # custom:
 #   key: value
 #   tags: ["foo", "bar"]

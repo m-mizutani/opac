@@ -90,3 +90,10 @@ func TestMetadata(t *testing.T) {
 			gt.Equal(t, v.Annotations.Custom["key"], "value")
 		})
 }
+
+func TestMetadataConflict(t *testing.T) {
+	_, err := opac.New(
+		opac.Files("testdata/metadata/conflict1.rego", "testdata/metadata/conflict2.rego"),
+	)
+	gt.Error(t, err)
+}

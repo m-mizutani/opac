@@ -124,16 +124,7 @@ type dataSource struct {
 
 // AnnotationSet implements Source.
 func (d *dataSource) AnnotationSet() *ast.AnnotationSet {
-	var modules []*ast.Module
-	for _, m := range d.compiler.Modules {
-		modules = append(modules, m)
-	}
-	as, err := ast.BuildAnnotationSet(modules)
-	if err != nil {
-		panic(fmt.Errorf("failed to build annotation set: %w", err))
-	}
-	return as
-
+	return d.compiler.GetAnnotationSet()
 }
 
 // Configure implements Source.

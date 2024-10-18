@@ -1,5 +1,5 @@
 # METADATA
-# title: my package
+# title: conflict1
 # custom:
 #   key: value
 #   tags: ["foo", "bar"]
@@ -8,6 +8,6 @@ package metadata_test
 
 import rego.v1
 
-resp contains "a" if {
+allow if {
     input.path == "/tmp/data"
 }

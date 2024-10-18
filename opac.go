@@ -85,5 +85,6 @@ func WithPrintHook(h print.Hook) QueryOption {
 
 // Metadata returns the annotation set of the policy data. It works only for local policy data (File or Data).
 func (c *Client) Metadata() ast.FlatAnnotationsRefSet {
-	return c.src.AnnotationSet().Flatten()
+	as := c.src.AnnotationSet()
+	return as.Flatten()
 }
