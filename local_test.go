@@ -6,6 +6,7 @@ import (
 
 	"github.com/m-mizutani/gt"
 	"github.com/m-mizutani/opac"
+	"github.com/open-policy-agent/opa/ast"
 )
 
 func TestLocal(t *testing.T) {
@@ -75,4 +76,24 @@ func TestLocal(t *testing.T) {
 			"number": float64(5),
 		},
 	}))
+}
+
+func TestMetadata(t *testing.T) {
+	p, err := opac.New(opac.Files("testdata/metadata/pkg.rego"))
+	gt.NoError(t, err)
+	meta := p.Metadata()
+	gt.A(t, meta).
+		Longer(0).
+		At(0, func(t testing.TB, v *ast.AnnotationsRef) {
+			gt.Equal(t, v.Annotations.Title, "my package")
+			gt.Equal(t, v.Annotations.Scope, "package")
+			gt.Equal(t, v.Annotations.Custom["key"], "value")
+		})
+}
+
+func TestMetadataConflict(t *testing.T) {
+	_, err := opac.New(
+		opac.Files("testdata/metadata/conflict1.rego", "testdata/metadata/conflict2.rego"),
+	)
+	gt.Error(t, err)
 }

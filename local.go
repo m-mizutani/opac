@@ -62,6 +62,9 @@ func (f *fileSource) Configure(cfg *config) error {
 
 	compiler, err := ast.CompileModulesWithOpt(policies, ast.CompileOpts{
 		EnablePrintStatements: true,
+		ParserOptions: ast.ParserOptions{
+			ProcessAnnotation: true,
+		},
 	})
 	if err != nil {
 		return fmt.Errorf("failed to compile policy: %w", err)
@@ -133,6 +136,9 @@ func (d *dataSource) Configure(cfg *config) error {
 
 	compiler, err := ast.CompileModulesWithOpt(d.policies, ast.CompileOpts{
 		EnablePrintStatements: true,
+		ParserOptions: ast.ParserOptions{
+			ProcessAnnotation: true,
+		},
 	})
 	if err != nil {
 		return fmt.Errorf("failed to compile policy: %w", err)
