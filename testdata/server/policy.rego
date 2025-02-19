@@ -1,10 +1,10 @@
 package system.authz
 
-allow {
+allow if {
     input.user == "admin"
 }
 
-allow {
+allow if {
     input.role == "developer"
 }
 

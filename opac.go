@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/open-policy-agent/opa/ast"
-	"github.com/open-policy-agent/opa/topdown/print"
+	"github.com/open-policy-agent/opa/v1/ast"
+	"github.com/open-policy-agent/opa/v1/topdown/print"
 )
 
 // Client is the main interface to interact with the opac library.

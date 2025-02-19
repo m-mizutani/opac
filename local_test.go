@@ -6,7 +6,7 @@ import (
 
 	"github.com/m-mizutani/gt"
 	"github.com/m-mizutani/opac"
-	"github.com/open-policy-agent/opa/ast"
+	"github.com/open-policy-agent/opa/v1/ast"
 )
 
 func TestLocal(t *testing.T) {
@@ -67,7 +67,7 @@ func TestLocal(t *testing.T) {
 	}))
 
 	t.Run("policy data", doTest(testCase{
-		src:   opac.Data(map[string]string{"policy.rego": "package color\nnumber := 5 { input.color == \"blue\" }"}),
+		src:   opac.Data(map[string]string{"policy.rego": "package color\nnumber := 5 if { input.color == \"blue\" }"}),
 		query: "data.color",
 		input: map[string]any{
 			"color": "blue",

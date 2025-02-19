@@ -8,8 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/open-policy-agent/opa/ast"
-	"github.com/open-policy-agent/opa/rego"
+	"github.com/open-policy-agent/opa/v1/ast"
+	"github.com/open-policy-agent/opa/v1/rego"
 )
 
 type fileSource struct {
@@ -64,6 +64,7 @@ func (f *fileSource) Configure(cfg *config) error {
 		EnablePrintStatements: true,
 		ParserOptions: ast.ParserOptions{
 			ProcessAnnotation: true,
+			RegoVersion:       ast.DefaultRegoVersion,
 		},
 	})
 	if err != nil {

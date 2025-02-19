@@ -31,7 +31,7 @@ func ExampleFiles() {
 
 func ExampleData() {
 	data := `package system.authz
-	  allow {
+	  allow if {
 	    input.user == "admin"
 	  }
 	`
