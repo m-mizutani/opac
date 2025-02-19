@@ -1,5 +1,5 @@
 package color
 
-number := 5 {
+number := 5 if {
     input.color == "blue"
 }

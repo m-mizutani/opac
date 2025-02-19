@@ -1,9 +1,9 @@
 package authz
 
-allow {
+allow if {
     input.user == "alice"
 }
 
-allow {
+allow if {
     input.role == "admin"
 }
